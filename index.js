@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
 const path = require('path');
+const { checkCard } = require('./gates/mockGateway');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -72,8 +73,13 @@ app.post('/login', (req, res) => {
 
   // Comparamos con las credenciales de las variables de entorno.
   if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
-    req.session.userId = username; // Guardamos el usuario en la sesión.
-    res.redirect('/dashboard');
+    // Guardamos el usuario en la sesión.
+    req.session.userId = username; 
+    // Nos aseguramos de que la sesión se guarde antes de redirigir.
+    req.session.save(err => {
+      if (err) return next(err); // Si hay un error al guardar, lo manejamos.
+      res.redirect('/dashboard'); // Redirigimos solo después de guardar.
+    });
   } else {
     res.render('login', { error: 'Usuario o contraseña incorrectos.' });
   }
@@ -81,7 +87,28 @@ app.post('/login', (req, res) => {
 
 // Ruta del panel de control (protegida por el middleware requireLogin).
 app.get('/dashboard', requireLogin, (req, res) => {
-  res.render('dashboard', { user: req.session.userId });
+  // Renderiza el dashboard sin resultados la primera vez.
+  res.render('dashboard', { user: req.session.userId, results: [] });
+});
+
+// Ruta para procesar la verificación de tarjetas.
+app.post('/check', requireLogin, async (req, res) => {
+  const { cards } = req.body;
+  if (!cards) {
+    return res.render('dashboard', { user: req.session.userId, results: [] });
+  }
+
+  // Separa cada línea en un array y elimina las vacías.
+  const cardList = cards.split('\n').map(c => c.trim()).filter(c => c);
+
+  const results = [];
+  for (const card of cardList) {
+    const ccNumber = card.split('|')[0]; // Extrae solo el número de la tarjeta.
+    const result = await checkCard(ccNumber);
+    results.push({ card: card, ...result });
+  }
+
+  res.render('dashboard', { user: req.session.userId, results: results });
 });
 
 // Ruta para cerrar sesión.
