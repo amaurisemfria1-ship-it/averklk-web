@@ -68,7 +68,7 @@ app.get('/login', (req, res) => {
 });
 
 // Ruta para procesar los datos del formulario de login.
-app.post('/login', (req, res) => {
+app.post('/login', (req, res, next) => { // 1. Añadir 'next' a los parámetros.
   const { username, password } = req.body;
 
   // Comparamos con las credenciales de las variables de entorno.
@@ -77,7 +77,10 @@ app.post('/login', (req, res) => {
     req.session.userId = username; 
     // Nos aseguramos de que la sesión se guarde antes de redirigir.
     req.session.save(err => {
-      if (err) return next(err); // Si hay un error al guardar, lo manejamos.
+      if (err) {
+        console.error("Error al guardar la sesión:", err);
+        return next(err);
+      }
       res.redirect('/dashboard'); // Redirigimos solo después de guardar.
     });
   } else {
