@@ -1,0 +1,7 @@
+mi-proyecto/
+├── views/
+│   ├── login.ejs
+│   └── dashboard.ejs
+├── .gitignore
+├── index.js
+└── package.json
