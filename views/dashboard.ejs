@@ -3,24 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Control</title>
-     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; padding: 2rem; background-color: #f9f9f9; color: #333; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        h1 { color: #007bff; }
-        .logout-form { margin-top: 2rem; }
-        .logout-button { background: #dc3545; color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 4px; cursor: pointer; font-size: 1rem; }
-        .logout-button:hover { background: #c82333; }
+    <title>Panel de Verificación</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #1a1a1a; color: #e0e0e0; margin: 0; padding: 2rem; }
+        .container { max-width: 700px; margin: auto; background: #2a2a2a; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 1rem; margin-bottom: 2rem; }
+        h1 { color: #4a90e2; margin: 0; }
+        .logout-button { background: #d93025; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
+        .checker-form textarea { width: 100%; height: 150px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #444; border-radius: 4px; padding: 0.5rem; margin-bottom: 1rem; resize: vertical; }
+        .check-button { width: 100%; padding: 0.75rem; background-color: #34a853; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold; }
+        .results-box { margin-top: 2rem; background: #1a1a1a; padding: 1rem; border-radius: 4px; }
+        .results-box h3 { margin-top: 0; color: #fbbc05; }
+        .result-line { padding: 0.5rem; border-bottom: 1px solid #333; }
+        .result-line.success { color: #34a853; }
+        .result-line.failure { color: #d93025; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>¡Bienvenido, <%- user %>!</h1>
-        <p>Has iniciado sesión en tu panel de control privado.</p>
-        
-        <form class="logout-form" action="/logout" method="POST">
-            <button class="logout-button" type="submit">Cerrar Sesión</button>
+        <div class="header">
+            <h1>Verificador Pro</h1>
+            <form action="/logout" method="POST">
+                <button class="logout-button" type="submit">Cerrar Sesión</button>
+            </form>
+        </div>
+
+        <form class="checker-form" action="/check" method="POST">
+            <label for="cards">Pega las tarjetas a verificar (una por línea):</label>
+            <textarea id="cards" name="cards" placeholder="5555444433332222|01|2028|123"></textarea>
+            <button class="check-button" type="submit">Verificar</button>
         </form>
+
+        <% if (typeof results !== 'undefined') { %>
+            <div class="results-box">
+                <h3>Resultados:</h3>
+                <% results.forEach(result => { %>
+                    <div class="result-line <%= result.success ? 'success' : 'failure' %>">
+                        <strong><%= result.card %>:</strong> <%= result.message %>
+                    </div>
+                <% }) %>
+            </div>
+        <% } %>
     </div>
 </body>
 </html>
