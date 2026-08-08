@@ -25,6 +25,9 @@ mongoose.connect(mongoUri)
 app.use(express.urlencoded({ extended: true })); // Para parsear datos de formularios.
 app.use(express.static('public')); // Para servir archivos estáticos (CSS, JS, imágenes).
 
+// Confiar en el proxy de Railway para la configuración de cookies seguras.
+app.set('trust proxy', 1);
+
 // Configuración de la sesión
 app.use(session({
   secret: process.env.SESSION_SECRET || 'un_secreto_por_defecto_muy_seguro',
