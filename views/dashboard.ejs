@@ -1,49 +1,123 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel de Verificación</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #1a1a1a; color: #e0e0e0; margin: 0; padding: 2rem; }
-        .container { max-width: 700px; margin: auto; background: #2a2a2a; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-        .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #444; padding-bottom: 1rem; margin-bottom: 2rem; }
-        h1 { color: #4a90e2; margin: 0; }
-        .logout-button { background: #d93025; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; }
-        .checker-form textarea { width: 100%; height: 150px; background: #1a1a1a; color: #e0e0e0; border: 1px solid #444; border-radius: 4px; padding: 0.5rem; margin-bottom: 1rem; resize: vertical; }
-        .check-button { width: 100%; padding: 0.75rem; background-color: #34a853; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: bold; }
-        .results-box { margin-top: 2rem; background: #1a1a1a; padding: 1rem; border-radius: 4px; }
-        .results-box h3 { margin-top: 0; color: #fbbc05; }
-        .result-line { padding: 0.5rem; border-bottom: 1px solid #333; }
-        .result-line.success { color: #34a853; }
-        .result-line.failure { color: #d93025; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Verificador Pro</h1>
-            <form action="/logout" method="POST">
-                <button class="logout-button" type="submit">Cerrar Sesión</button>
-            </form>
-        </div>
+// index.js
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
+const path = require('path');
+const { checkCard } = require('./gates/mockGateway');
 
-        <form class="checker-form" action="/check" method="POST">
-            <label for="cards">Pega las tarjetas a verificar (una por línea):</label>
-            <textarea id="cards" name="cards" placeholder="5555444433332222|01|2028|123"></textarea>
-            <button class="check-button" type="submit">Verificar</button>
-        </form>
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-        <% if (typeof results !== 'undefined') { %>
-            <div class="results-box">
-                <h3>Resultados:</h3>
-                <% results.forEach(result => { %>
-                    <div class="result-line <%= result.success ? 'success' : 'failure' %>">
-                        <strong><%= result.card %>:</strong> <%= result.message %>
-                    </div>
-                <% }) %>
-            </div>
-        <% } %>
-    </div>
-</body>
-</html>
+// --- Conexión a MongoDB ---
+// Railway inyectará la variable MONGO_URI automáticamente.
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error('Error: La variable de entorno MONGO_URI no está definida.');
+  process.exit(1); // Detiene la aplicación si la URI de la base de datos no está presente.
+}
+mongoose.connect(mongoUri)
+  .then(() => console.log('Conectado a MongoDB...'))
+  .catch(err => console.error('No se pudo conectar a MongoDB...', err));
+
+// --- Middlewares ---
+app.use(express.urlencoded({ extended: true })); // Para parsear datos de formularios.
+app.use(express.static('public')); // Para servir archivos estáticos (CSS, JS, imágenes).
+
+// Configuración de la sesión
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'un_secreto_por_defecto_muy_seguro',
+  resave: false,
+  saveUninitialized: true,
+  store: MongoStore.create({ 
+    mongoUrl: mongoUri,
+    collectionName: 'sessions' // Nombre de la colección donde se guardarán las sesiones
+  }),
+  // En producción (como en Railway), la cookie debe ser segura (HTTPS).
+  cookie: { secure: process.env.NODE_ENV === 'production' } 
+}));
+
+// Configurar EJS como motor de plantillas y la carpeta de vistas.
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// --- Middleware para proteger rutas ---
+const requireLogin = (req, res, next) => {
+  if (req.session && req.session.userId) {
+    return next(); // El usuario está logueado, puede continuar.
+  } else {
+    return res.redirect('/login'); // No está logueado, se redirige al login.
+  }
+};
+
+// --- Rutas de la aplicación ---
+
+// Ruta principal: redirige al dashboard si está logueado, si no, al login.
+app.get('/', (req, res) => {
+  if (req.session.userId) {
+    res.redirect('/dashboard');
+  } else {
+    res.redirect('/login');
+  }
+});
+
+// Ruta para mostrar el formulario de login.
+app.get('/login', (req, res) => {
+  res.render('login', { error: null });
+});
+
+// Ruta para procesar los datos del formulario de login.
+app.post('/login', (req, res) => {
+  const { username, password } = req.body;
+
+  // Comparamos con las credenciales de las variables de entorno.
+  if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
+    req.session.userId = username; // Guardamos el usuario en la sesión.
+    res.redirect('/dashboard');
+  } else {
+    res.render('login', { error: 'Usuario o contraseña incorrectos.' });
+  }
+});
+
+// Ruta del panel de control (protegida por el middleware requireLogin).
+app.get('/dashboard', requireLogin, (req, res) => {
+  // Renderiza el dashboard sin resultados la primera vez.
+  res.render('dashboard', { user: req.session.userId, results: [] });
+});
+
+// Ruta para procesar la verificación de tarjetas.
+app.post('/check', requireLogin, async (req, res) => {
+  const { cards } = req.body;
+  if (!cards) {
+    return res.render('dashboard', { user: req.session.userId, results: [] });
+  }
+
+  // Separa cada línea en un array y elimina las vacías.
+  const cardList = cards.split('\n').map(c => c.trim()).filter(c => c);
+
+  const results = [];
+  for (const card of cardList) {
+    const ccNumber = card.split('|')[0]; // Extrae solo el número de la tarjeta.
+    const result = await checkCard(ccNumber);
+    results.push({ card: card, ...result });
+  }
+
+  res.render('dashboard', { user: req.session.userId, results: results });
+});
+
+// Ruta para cerrar sesión.
+app.post('/logout', (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.redirect('/dashboard');
+    }
+    res.clearCookie('connect.sid'); // Limpia la cookie de sesión del navegador.
+    res.redirect('/login');
+  });
+});
+
+// Iniciar el servidor.
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Servidor corriendo en el puerto ${PORT}`);
+});
