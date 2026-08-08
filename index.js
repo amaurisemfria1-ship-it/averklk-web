@@ -36,7 +36,7 @@ app.use(session({
   cookie: { secure: process.env.NODE_ENV === 'production' }
 }));
 
-// Configurar EJS como motor de plantillas y la carpeta de vistas
+// Configurar EJS como motor de plantillas
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
@@ -49,9 +49,7 @@ const requireLogin = (req, res, next) => {
   }
 };
 
-// Rutas de la aplicación
-
-// Ruta principal: redirige al dashboard si está logueado, si no, al login
+// Rutas
 app.get('/', (req, res) => {
   if (req.session && req.session.userId) {
     res.redirect('/dashboard');
@@ -60,12 +58,10 @@ app.get('/', (req, res) => {
   }
 });
 
-// Ruta para mostrar el formulario de login
 app.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
 
-// Ruta para procesar los datos del formulario de login
 app.post('/login', (req, res) => {
   const { username, password } = req.body;
   if (username === process.env.ADMIN_USER && password === process.env.ADMIN_PASS) {
@@ -76,12 +72,10 @@ app.post('/login', (req, res) => {
   }
 });
 
-// Ruta del panel de control (protegida)
 app.get('/dashboard', requireLogin, (req, res) => {
   res.render('dashboard', { user: req.session.userId, results: [] });
 });
 
-// Ruta para procesar la verificación
 app.post('/check', requireLogin, async (req, res) => {
   const { cards } = req.body;
   if (!cards) {
@@ -100,7 +94,6 @@ app.post('/check', requireLogin, async (req, res) => {
   res.render('dashboard', { user: req.session.userId, results });
 });
 
-// Ruta para cerrar sesión
 app.post('/logout', (req, res) => {
   req.session.destroy(err => {
     if (err) {
