@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
+const MongoStore = require('connect-mongo');
 const path = require('path');
 
 const app = express();
@@ -10,7 +11,12 @@ const PORT = process.env.PORT || 3000;
 
 // --- Conexión a MongoDB ---
 // Railway inyectará la variable MONGO_URI automáticamente.
-mongoose.connect(process.env.MONGO_URI)
+const mongoUri = process.env.MONGO_URI;
+if (!mongoUri) {
+  console.error('Error: La variable de entorno MONGO_URI no está definida.');
+  process.exit(1); // Detiene la aplicación si la URI de la base de datos no está presente.
+}
+mongoose.connect(mongoUri)
   .then(() => console.log('Conectado a MongoDB...'))
   .catch(err => console.error('No se pudo conectar a MongoDB...', err));
 
@@ -23,6 +29,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'un_secreto_por_defecto_muy_seguro',
   resave: false,
   saveUninitialized: true,
+  store: MongoStore.create({ 
+    mongoUrl: mongoUri,
+    collectionName: 'sessions' // Nombre de la colección donde se guardarán las sesiones
+  }),
   // En producción (como en Railway), la cookie debe ser segura (HTTPS).
   cookie: { secure: process.env.NODE_ENV === 'production' } 
 }));
