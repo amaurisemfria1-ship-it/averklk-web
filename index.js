@@ -71,7 +71,7 @@ app.get('/login', (req, res) => {
 });
 
 // Ruta para procesar los datos del formulario de login.
-app.post('/login', (req, res, next) => { // 1. Añadir 'next' a los parámetros.
+app.post('/login', (req, res, next) => {
   const { username, password } = req.body;
 
   // Comparamos con las credenciales de las variables de entorno.
